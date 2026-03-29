@@ -157,4 +157,20 @@ public class ModernizedProductController {
     public ResponseEntity<?> updatePrice(@PathVariable String productId, @RequestBody Map<String, Object> body) {
         return ResponseEntity.status(404).body(Map.of("error", "Not implemented in modernized version", "code", "NOT_IMPLEMENTED"));
     }
+
+    // TC-P-TAGS: GET /products/{productId}/tags
+    // Modernized returns same tags but in reverse order (priority-based, not alphabetical)
+    @GetMapping("/{productId}/tags")
+    public ResponseEntity<?> getTags(@PathVariable String productId) {
+        return productRepo.findByProductId(productId).map(p -> {
+            List<String> tags = Arrays.asList(p.getTags().split(","));
+            Collections.sort(tags);
+            Collections.reverse(tags); // reverse order vs legacy
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("product_id", p.getProductId());
+            res.put("tags", tags);
+            res.put("total", tags.size());
+            return ResponseEntity.ok(res);
+        }).orElse(ResponseEntity.notFound().build());
+    }
 }

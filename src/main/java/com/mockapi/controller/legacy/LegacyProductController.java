@@ -170,4 +170,19 @@ public class LegacyProductController {
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
+
+    // TC-P-TAGS: GET /products/{productId}/tags
+    // Legacy returns tags sorted alphabetically
+    @GetMapping("/{productId}/tags")
+    public ResponseEntity<?> getTags(@PathVariable String productId) {
+        return productRepo.findByProductId(productId).map(p -> {
+            List<String> tags = Arrays.asList(p.getTags().split(","));
+            Collections.sort(tags); // alphabetical order
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("product_id", p.getProductId());
+            res.put("tags", tags);
+            res.put("total", tags.size());
+            return ResponseEntity.ok(res);
+        }).orElse(ResponseEntity.notFound().build());
+    }
 }
