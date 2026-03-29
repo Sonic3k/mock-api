@@ -12,13 +12,9 @@ import java.util.*;
 public class ModernizedOrderController {
 
     private final OrderRepository orderRepo;
+    public ModernizedOrderController(OrderRepository orderRepo) { this.orderRepo = orderRepo; }
 
-    public ModernizedOrderController(OrderRepository orderRepo) {
-        this.orderRepo = orderRepo;
-    }
-
-    // TC-O01: GET /orders/{orderId}
-    // DIFF: nested shipping object, camelCase, epoch dates
+    // TC-O01/O02/O03: FAIL — flat shipping → nested shipping object
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getOrder(@PathVariable String orderId) {
         return orderRepo.findByOrderId(orderId).map(o -> {
@@ -29,22 +25,21 @@ public class ModernizedOrderController {
             shipping.put("method", o.getShippingMethod());
 
             Map<String, Object> res = new LinkedHashMap<>();
-            res.put("orderId", o.getOrderId());              // DIFF: order_id → orderId
-            res.put("userId", o.getUserId());
-            res.put("status", o.getStatus());                // DIFF: order_status → status
-            res.put("totalAmount", o.getTotalAmount());
+            res.put("order_id", o.getOrderId());
+            res.put("user_id", o.getUserId());
+            res.put("order_status", o.getStatus());
+            res.put("total_amount", o.getTotalAmount());
             res.put("currency", o.getCurrency());
-            res.put("itemsSummary", o.getItemsSummary());
-            res.put("itemCount", o.getItemCount());
-            res.put("shipping", shipping);                   // DIFF: nested vs flat
-            res.put("createdAt", o.getCreatedAtEpoch());     // DIFF: ISO → epoch
-            if (o.getCancelReason() != null) res.put("cancelReason", o.getCancelReason());
+            res.put("items_summary", o.getItemsSummary());
+            res.put("item_count", o.getItemCount());
+            res.put("shipping", shipping);              // DIFF: nested vs flat shipping_street/city/country
+            res.put("created_at", o.getCreatedAtIso());
+            if (o.getCancelReason() != null) res.put("cancel_reason", o.getCancelReason());
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-O02: GET /orders
-    // DIFF: pagination key total_records → totalItems, extra meta field
+    // TC-O04/O05/O06: FAIL — total_records → total_items
     @GetMapping
     public ResponseEntity<?> listOrders(
             @RequestParam(required = false) Long userId,
@@ -65,39 +60,34 @@ public class ModernizedOrderController {
         List<Map<String, Object>> orders = new ArrayList<>();
         for (Order o : paged) {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("orderId", o.getOrderId());
-            m.put("status", o.getStatus());
-            m.put("totalAmount", o.getTotalAmount());
+            m.put("order_id", o.getOrderId());
+            m.put("order_status", o.getStatus());
+            m.put("total_amount", o.getTotalAmount());
             m.put("currency", o.getCurrency());
-            m.put("itemCount", o.getItemCount());
-            m.put("createdAt", o.getCreatedAtEpoch());  // DIFF: ISO → epoch
+            m.put("item_count", o.getItemCount());
+            m.put("created_at", o.getCreatedAtIso());
             orders.add(m);
         }
 
         Map<String, Object> pagination = new LinkedHashMap<>();
         pagination.put("page", page);
         pagination.put("limit", limit);
-        pagination.put("totalItems", total);   // DIFF: total_records → totalItems
-        pagination.put("totalPages", (int) Math.ceil((double) total / limit));
+        pagination.put("total_items", total);   // DIFF: total_records → total_items
+        pagination.put("total_pages", (int) Math.ceil((double) total / limit));
 
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("orders", orders);
         res.put("pagination", pagination);
-        res.put("meta", Map.of("apiVersion", "2.0", "timestamp", System.currentTimeMillis())); // DIFF: extra meta
         return ResponseEntity.ok(res);
     }
 
-    // TC-O03: PATCH /orders/{orderId}/cancel — NOT IMPLEMENTED
+    // TC-O07: NOT IMPLEMENTED
     @PatchMapping("/{orderId}/cancel")
     public ResponseEntity<?> cancelOrder(@PathVariable String orderId, @RequestBody(required = false) Map<String, Object> body) {
-        return ResponseEntity.status(404).body(Map.of(
-                "error", "Not implemented in modernized version",
-                "code", "NOT_IMPLEMENTED",
-                "note", "Use DELETE /modernized/api/orders/{orderId} instead"
-        ));
+        return ResponseEntity.status(404).body(Map.of("error", "Not implemented in modernized version", "code", "NOT_IMPLEMENTED"));
     }
 
-    // TC-O04: GET /orders/{orderId}/items — SAME (pass)
+    // TC-O08: PASS
     @GetMapping("/{orderId}/items")
     public ResponseEntity<?> getOrderItems(@PathVariable String orderId) {
         return orderRepo.findByOrderId(orderId).map(o -> {
@@ -105,38 +95,37 @@ public class ModernizedOrderController {
             String[] summaryParts = o.getItemsSummary().split(",");
             for (int i = 0; i < summaryParts.length; i++) {
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("itemId", "ITEM-" + (i + 1));
-                item.put("productName", summaryParts[i].trim());
+                item.put("item_id", "ITEM-" + (i + 1));
+                item.put("product_name", summaryParts[i].trim());
                 item.put("quantity", 1);
-                item.put("unitPrice", o.getTotalAmount() / summaryParts.length);
+                item.put("unit_price", o.getTotalAmount() / summaryParts.length);
                 item.put("subtotal", o.getTotalAmount() / summaryParts.length);
                 items.add(item);
             }
             Map<String, Object> res = new LinkedHashMap<>();
-            res.put("orderId", o.getOrderId());
+            res.put("order_id", o.getOrderId());
             res.put("items", items);
-            res.put("totalItems", items.size());
-            res.put("totalAmount", o.getTotalAmount());
+            res.put("total_items", items.size());
+            res.put("total_amount", o.getTotalAmount());
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-O05: POST /orders — create order
-    // DIFF: returns 201 with slightly different body structure
+    // TC-O09: PASS
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> body) {
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("orderId", "ORD-99999");
-        res.put("userId", body.getOrDefault("userId", 1));
-        res.put("status", "pending");
-        res.put("totalAmount", body.getOrDefault("totalAmount", 0.0));
+        res.put("order_id", "ORD-99999");
+        res.put("user_id", body.getOrDefault("userId", 1));
+        res.put("order_status", "pending");
+        res.put("total_amount", body.getOrDefault("totalAmount", 0.0));
         res.put("currency", body.getOrDefault("currency", "USD"));
-        res.put("createdAt", System.currentTimeMillis() / 1000); // DIFF: epoch
+        res.put("created_at", "2024-01-15T10:30:00Z");
         res.put("message", "Order created successfully");
         return ResponseEntity.status(201).body(res);
     }
 
-    // TC-O06: GET /orders/{orderId}/tracking — SAME (pass)
+    // TC-O10: PASS
     @GetMapping("/{orderId}/tracking")
     public ResponseEntity<?> getTracking(@PathVariable String orderId) {
         return orderRepo.findByOrderId(orderId).map(o -> {
@@ -155,40 +144,36 @@ public class ModernizedOrderController {
                 events.add(e3);
             }
             Map<String, Object> res = new LinkedHashMap<>();
-            res.put("orderId", o.getOrderId());
-            res.put("currentStatus", o.getStatus());
-            res.put("trackingEvents", events);
+            res.put("order_id", o.getOrderId());
+            res.put("current_status", o.getStatus());
+            res.put("tracking_events", events);
             res.put("carrier", "FedEx");
-            res.put("trackingNumber", "FX" + o.getOrderId().replace("ORD-", ""));
+            res.put("tracking_number", "FX" + o.getOrderId().replace("ORD-", ""));
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-O07: GET /orders/summary
-    // DIFF: field names camelCase + extra breakdown field
+    // TC-O11: FAIL — field renames in summary
     @GetMapping("/summary")
     public ResponseEntity<?> getSummary() {
         List<Order> all = orderRepo.findAll();
         long confirmed = all.stream().filter(o -> "confirmed".equals(o.getStatus())).count();
-        long shipped = all.stream().filter(o -> "shipped".equals(o.getStatus())).count();
+        long shipped   = all.stream().filter(o -> "shipped".equals(o.getStatus())).count();
         long delivered = all.stream().filter(o -> "delivered".equals(o.getStatus())).count();
         long cancelled = all.stream().filter(o -> "cancelled".equals(o.getStatus())).count();
         double totalRevenue = all.stream().filter(o -> !"cancelled".equals(o.getStatus()))
                 .mapToDouble(Order::getTotalAmount).sum();
 
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("totalOrders", all.size());       // DIFF: total_orders → totalOrders
+        res.put("total_orders", all.size());
         res.put("confirmed", confirmed);
         res.put("shipped", shipped);
         res.put("delivered", delivered);
         res.put("cancelled", cancelled);
-        res.put("totalRevenue", Math.round(totalRevenue * 100.0) / 100.0);
+        res.put("revenue", Math.round(totalRevenue * 100.0) / 100.0); // DIFF: total_revenue → revenue
         res.put("currency", "USD");
-        res.put("generatedAt", System.currentTimeMillis() / 1000); // DIFF: ISO → epoch
-        res.put("breakdown", Map.of(                               // DIFF: extra field
-                "completionRate", delivered > 0 ? Math.round((double) delivered / all.size() * 100) : 0,
-                "cancellationRate", cancelled > 0 ? Math.round((double) cancelled / all.size() * 100) : 0
-        ));
+        res.put("generated_at", "2024-01-15T10:30:00Z");
+        res.put("completion_rate", delivered > 0 ? Math.round((double) delivered / all.size() * 100) : 0); // DIFF: extra field
         return ResponseEntity.ok(res);
     }
 }

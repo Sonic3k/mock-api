@@ -21,19 +21,17 @@ public class ModernizedPaymentController {
         this.userRepo = userRepo;
     }
 
-    // TC-PAY01: POST /payments
-    // DIFF: user with discount=100 → 500 (same as legacy — but field names differ)
+    // TC-PAY01/PAY02: PASS — same fields as legacy
     @PostMapping
     public ResponseEntity<?> processPayment(@RequestBody Map<String, Object> body) {
         Long userId = body.get("userId") != null ? Long.parseLong(body.get("userId").toString()) : 1L;
         Optional<User> userOpt = userRepo.findById(userId);
 
+        // TC-PAY03: userId=20 (discount=100) → 500 in modernized (different error than legacy 422)
         if (userOpt.isPresent() && userOpt.get().getDiscount() == 100.0) {
-            // DIFF: different error structure than legacy
             return ResponseEntity.status(500).body(Map.of(
                     "error", "PAYMENT_PROCESSING_ERROR",
-                    "message", "Failed to calculate final amount",
-                    "details", "Division by zero: discount rate invalid"
+                    "message", "Failed to calculate final amount"
             ));
         }
 
@@ -42,74 +40,71 @@ public class ModernizedPaymentController {
         double finalAmount = amount * (1 - discount / 100);
 
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("paymentId", "PAY-NEW-001");            // DIFF: payment_id → paymentId
-        res.put("orderId", body.getOrDefault("orderId", ""));
-        res.put("userId", userId);
-        res.put("originalAmount", amount);              // DIFF: original_amount → originalAmount
-        res.put("discountApplied", discount);           // DIFF: discount_applied → discountApplied
-        res.put("finalAmount", Math.round(finalAmount * 100.0) / 100.0);
+        res.put("payment_id", "PAY-NEW-001");
+        res.put("order_id", body.getOrDefault("orderId", ""));
+        res.put("user_id", userId);
+        res.put("original_amount", amount);
+        res.put("discount_applied", discount);
+        res.put("final_amount", Math.round(finalAmount * 100.0) / 100.0);
         res.put("currency", body.getOrDefault("currency", "USD"));
-        res.put("status", "processing");                // DIFF: payment_status → status
-        res.put("method", body.getOrDefault("method", "credit_card"));
-        res.put("transactionId", "TXN-" + System.currentTimeMillis());
-        res.put("createdAt", System.currentTimeMillis() / 1000); // DIFF: epoch
+        res.put("payment_status", "processing");
+        res.put("payment_method", body.getOrDefault("method", "credit_card"));
+        res.put("transaction_id", "TXN-" + System.currentTimeMillis());
+        res.put("created_at", "2024-01-15T10:30:00Z");
         res.put("message", "Payment initiated successfully");
         return ResponseEntity.status(201).body(res);
     }
 
-    // TC-PAY02: GET /payments/{paymentId}
-    // DIFF: field renames camelCase
+    // TC-PAY04/PAY05: PASS — same fields as legacy
     @GetMapping("/{paymentId}")
     public ResponseEntity<?> getPayment(@PathVariable String paymentId) {
         return paymentRepo.findByPaymentId(paymentId).map(p -> {
             Map<String, Object> res = new LinkedHashMap<>();
-            res.put("paymentId", p.getPaymentId());
-            res.put("orderId", p.getOrderId());
-            res.put("userId", p.getUserId());
+            res.put("payment_id", p.getPaymentId());
+            res.put("order_id", p.getOrderId());
+            res.put("user_id", p.getUserId());
             res.put("amount", p.getAmount());
             res.put("currency", p.getCurrency());
-            res.put("status", p.getStatus());           // DIFF: payment_status → status
-            res.put("method", p.getMethod());           // DIFF: payment_method → method
-            if (p.getCardLast4() != null) res.put("cardLast4", p.getCardLast4()); // DIFF: card_last4 → cardLast4
-            res.put("createdAt", p.getCreatedAtEpoch()); // DIFF: ISO → epoch
-            res.put("transactionId", "TXN-" + p.getPaymentId());
+            res.put("payment_status", p.getStatus());
+            res.put("payment_method", p.getMethod());
+            if (p.getCardLast4() != null) res.put("card_last4", p.getCardLast4());
+            res.put("created_at", p.getCreatedAtIso());
+            res.put("transaction_id", "TXN-" + p.getPaymentId());
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-PAY03: POST /payments/{paymentId}/refund
-    // DIFF: refund structure simplified, missing estimated_completion
+    // TC-PAY06: FAIL — missing estimated_completion field
     @PostMapping("/{paymentId}/refund")
     public ResponseEntity<?> refund(@PathVariable String paymentId, @RequestBody Map<String, Object> body) {
         return paymentRepo.findByPaymentId(paymentId).map(p -> {
             if ("failed".equals(p.getStatus())) {
                 return ResponseEntity.status(422).body(Map.of(
                         "error", "Cannot refund a failed payment",
-                        "paymentId", paymentId,
-                        "currentStatus", p.getStatus()
+                        "payment_id", paymentId,
+                        "current_status", p.getStatus()
                 ));
             }
             double refundAmount = body.get("amount") != null ?
                     Double.parseDouble(body.get("amount").toString()) : p.getAmount();
 
             Map<String, Object> res = new LinkedHashMap<>();
-            res.put("refundId", "REF-" + paymentId);
-            res.put("paymentId", paymentId);
-            res.put("orderId", p.getOrderId());
-            res.put("refundAmount", refundAmount);
+            res.put("refund_id", "REF-" + paymentId);
+            res.put("payment_id", paymentId);
+            res.put("order_id", p.getOrderId());
+            res.put("refund_amount", refundAmount);
             res.put("currency", p.getCurrency());
-            res.put("status", "processing");
+            res.put("refund_status", "processing");
             res.put("reason", body.getOrDefault("reason", "customer_request"));
-            res.put("type", refundAmount < p.getAmount() ? "partial" : "full"); // DIFF: refund_type → type
-            res.put("initiatedAt", System.currentTimeMillis() / 1000);          // DIFF: epoch
-            // DIFF: missing "estimated_completion" field
+            res.put("refund_type", refundAmount < p.getAmount() ? "partial" : "full");
+            res.put("initiated_at", "2024-01-15T10:30:00Z");
+            // DIFF: missing "estimated_completion" field from legacy
             res.put("message", "Refund initiated successfully");
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-PAY04: GET /payments
-    // DIFF: response key rename + extra pagination info
+    // TC-PAY08/PAY09: PASS — same fields as legacy
     @GetMapping
     public ResponseEntity<?> listPayments(
             @RequestParam(required = false) Long userId,
@@ -125,50 +120,46 @@ public class ModernizedPaymentController {
         List<Map<String, Object>> payments = new ArrayList<>();
         for (Payment p : paged) {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("paymentId", p.getPaymentId());
-            m.put("orderId", p.getOrderId());
+            m.put("payment_id", p.getPaymentId());
+            m.put("order_id", p.getOrderId());
             m.put("amount", p.getAmount());
             m.put("currency", p.getCurrency());
-            m.put("status", p.getStatus());
-            m.put("method", p.getMethod());
-            m.put("createdAt", p.getCreatedAtEpoch()); // DIFF: ISO → epoch
+            m.put("payment_status", p.getStatus());
+            m.put("payment_method", p.getMethod());
+            m.put("created_at", p.getCreatedAtIso());
             payments.add(m);
         }
 
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("data", payments);           // DIFF: "payments" → "data"
-        res.put("total", total);             // DIFF: total_count → total
+        res.put("payments", payments);
+        res.put("total_count", total);
         res.put("page", page);
-        res.put("pageSize", limit);          // DIFF: limit → pageSize
+        res.put("limit", limit);
         return ResponseEntity.ok(res);
     }
 
-    // TC-PAY05: GET /payments/{paymentId}/receipt — SAME (pass)
+    // TC-PAY10: PASS — same fields as legacy
     @GetMapping("/{paymentId}/receipt")
     public ResponseEntity<?> getReceipt(@PathVariable String paymentId) {
         return paymentRepo.findByPaymentId(paymentId).map(p -> {
             Map<String, Object> res = new LinkedHashMap<>();
-            res.put("receiptId", "RCP-" + paymentId);
-            res.put("paymentId", p.getPaymentId());
-            res.put("orderId", p.getOrderId());
+            res.put("receipt_id", "RCP-" + paymentId);
+            res.put("payment_id", p.getPaymentId());
+            res.put("order_id", p.getOrderId());
             res.put("amount", p.getAmount());
             res.put("currency", p.getCurrency());
-            res.put("method", p.getMethod());
-            if (p.getCardLast4() != null) res.put("cardLast4", p.getCardLast4());
+            res.put("payment_method", p.getMethod());
+            if (p.getCardLast4() != null) res.put("card_last4", p.getCardLast4());
             res.put("status", p.getStatus());
-            res.put("issuedAt", p.getCreatedAtIso());
-            res.put("downloadUrl", "/modernized/api/payments/" + paymentId + "/receipt/pdf");
+            res.put("issued_at", p.getCreatedAtIso());
+            res.put("download_url", "/modernized/api/payments/" + paymentId + "/receipt/pdf");
             return ResponseEntity.ok(res);
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-PAY06: POST /payments/{paymentId}/capture — NOT IMPLEMENTED
+    // TC-PAY11: NOT IMPLEMENTED
     @PostMapping("/{paymentId}/capture")
     public ResponseEntity<?> capture(@PathVariable String paymentId) {
-        return ResponseEntity.status(404).body(Map.of(
-                "error", "Not implemented in modernized version",
-                "code", "NOT_IMPLEMENTED",
-                "note", "Modernized payments use auto-capture on creation"
-        ));
+        return ResponseEntity.status(404).body(Map.of("error", "Not implemented in modernized version", "code", "NOT_IMPLEMENTED"));
     }
 }
