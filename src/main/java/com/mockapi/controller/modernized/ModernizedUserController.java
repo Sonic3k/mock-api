@@ -1,5 +1,6 @@
 package com.mockapi.controller.modernized;
 
+import com.mockapi.config.TokenValidator;
 import com.mockapi.entity.User;
 import com.mockapi.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +13,19 @@ import java.util.*;
 public class ModernizedUserController {
 
     private final UserRepository userRepo;
-    public ModernizedUserController(UserRepository userRepo) { this.userRepo = userRepo; }
+    private final TokenValidator tokenValidator;
+
+    public ModernizedUserController(UserRepository userRepo, TokenValidator tokenValidator) {
+        this.userRepo = userRepo;
+        this.tokenValidator = tokenValidator;
+    }
 
     // TC-U01/U02: FAIL — flat address → nested, discount_percent → discountPercent
+    // PROTECTED: requires Bearer token
     @GetMapping("/{id}")
-    public ResponseEntity<?> getUser(@PathVariable Long id) {
+    public ResponseEntity<?> getUser(@PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (!tokenValidator.isValid(auth)) return TokenValidator.unauthorized();
         return userRepo.findById(id).map(u -> {
             Map<String, Object> address = new LinkedHashMap<>();
             address.put("street", u.getStreet());

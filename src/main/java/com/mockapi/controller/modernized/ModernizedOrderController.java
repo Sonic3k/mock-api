@@ -1,5 +1,6 @@
 package com.mockapi.controller.modernized;
 
+import com.mockapi.config.TokenValidator;
 import com.mockapi.entity.Order;
 import com.mockapi.repository.OrderRepository;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +13,18 @@ import java.util.*;
 public class ModernizedOrderController {
 
     private final OrderRepository orderRepo;
-    public ModernizedOrderController(OrderRepository orderRepo) { this.orderRepo = orderRepo; }
+    private final TokenValidator tokenValidator;
 
-    // TC-O01/O02/O03: FAIL — flat shipping → nested shipping object
+    public ModernizedOrderController(OrderRepository orderRepo, TokenValidator tokenValidator) {
+        this.orderRepo = orderRepo;
+        this.tokenValidator = tokenValidator;
+    }
+
+    // TC-O01/O02/O03: FAIL — flat shipping → nested shipping object — PROTECTED
     @GetMapping("/{orderId}")
-    public ResponseEntity<?> getOrder(@PathVariable String orderId) {
+    public ResponseEntity<?> getOrder(@PathVariable String orderId,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (!tokenValidator.isValid(auth)) return TokenValidator.unauthorized();
         return orderRepo.findByOrderId(orderId).map(o -> {
             Map<String, Object> shipping = new LinkedHashMap<>();
             shipping.put("street", o.getShippingStreet());

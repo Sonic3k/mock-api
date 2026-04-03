@@ -1,5 +1,6 @@
 package com.mockapi.controller.legacy;
 
+import com.mockapi.config.TokenValidator;
 import com.mockapi.entity.User;
 import com.mockapi.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
@@ -12,14 +13,18 @@ import java.util.*;
 public class LegacyUserController {
 
     private final UserRepository userRepo;
+    private final TokenValidator tokenValidator;
 
-    public LegacyUserController(UserRepository userRepo) {
+    public LegacyUserController(UserRepository userRepo, TokenValidator tokenValidator) {
         this.userRepo = userRepo;
+        this.tokenValidator = tokenValidator;
     }
 
-    // TC-U01: GET /users/{id} — returns flat address + snake_case + ISO date
+    // TC-U01: GET /users/{id} — PROTECTED: requires Bearer token
     @GetMapping("/{id}")
-    public ResponseEntity<?> getUser(@PathVariable Long id) {
+    public ResponseEntity<?> getUser(@PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (!tokenValidator.isValid(auth)) return TokenValidator.unauthorized();
         return userRepo.findById(id).map(u -> {
             Map<String, Object> res = new LinkedHashMap<>();
             res.put("user_id", u.getId());

@@ -1,41 +1,24 @@
 package com.mockapi.controller;
 
+import com.mockapi.config.TokenValidator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Simulates an OAuth2 Authorization Server + protected resource endpoints.
- * Used to test the Comparison Tool's auth handling.
- *
- * Clients:
- *   client_id=legacy-client,   client_secret=legacy-secret   → scope=legacy:read
- *   client_id=modern-client,   client_secret=modern-secret   → scope=modern:read modern:write
- *   client_id=invalid-client,  client_secret=anything        → 401
- *
- * Static bearer tokens (for BEARER type auth profile):
- *   static-token-legacy  → valid for /protected/legacy/*
- *   static-token-modern  → valid for /protected/modern/*
- *   bad-token            → always 401
- */
 @RestController
 public class AuthServerController {
 
-    // issued tokens: token → clientId
-    private static final Map<String, String> ISSUED_TOKENS = new ConcurrentHashMap<>();
+    // Use shared token store from TokenValidator
+    private static final Map<String, String> ISSUED_TOKENS = TokenValidator.ISSUED_TOKENS;
 
     private static final Map<String, String[]> VALID_CLIENTS = Map.of(
         "legacy-client", new String[]{"legacy-secret", "legacy:read"},
         "modern-client", new String[]{"modern-secret", "modern:read modern:write"}
     );
+        "modern-client", new String[]{"modern-secret", "modern:read modern:write"}
+    );
 
-    static {
-        // Pre-seed static bearer tokens
-        ISSUED_TOKENS.put("static-token-legacy", "legacy-client");
-        ISSUED_TOKENS.put("static-token-modern", "modern-client");
-    }
 
     // ── POST /oauth/token ─────────────────────────────────────────────────────
     @PostMapping(value = "/oauth/token",

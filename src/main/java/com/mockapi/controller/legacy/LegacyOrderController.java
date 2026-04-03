@@ -1,5 +1,6 @@
 package com.mockapi.controller.legacy;
 
+import com.mockapi.config.TokenValidator;
 import com.mockapi.entity.Order;
 import com.mockapi.repository.OrderRepository;
 import org.springframework.http.ResponseEntity;
@@ -12,14 +13,18 @@ import java.util.*;
 public class LegacyOrderController {
 
     private final OrderRepository orderRepo;
+    private final TokenValidator tokenValidator;
 
-    public LegacyOrderController(OrderRepository orderRepo) {
+    public LegacyOrderController(OrderRepository orderRepo, TokenValidator tokenValidator) {
         this.orderRepo = orderRepo;
+        this.tokenValidator = tokenValidator;
     }
 
-    // TC-O01: GET /orders/{orderId}
+    // TC-O01: GET /orders/{orderId} — PROTECTED
     @GetMapping("/{orderId}")
-    public ResponseEntity<?> getOrder(@PathVariable String orderId) {
+    public ResponseEntity<?> getOrder(@PathVariable String orderId,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (!tokenValidator.isValid(auth)) return TokenValidator.unauthorized();
         return orderRepo.findByOrderId(orderId).map(o -> {
             Map<String, Object> res = new LinkedHashMap<>();
             res.put("order_id", o.getOrderId());

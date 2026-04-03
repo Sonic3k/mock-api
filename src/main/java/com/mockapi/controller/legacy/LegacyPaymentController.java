@@ -1,5 +1,6 @@
 package com.mockapi.controller.legacy;
 
+import com.mockapi.config.TokenValidator;
 import com.mockapi.entity.Payment;
 import com.mockapi.entity.User;
 import com.mockapi.repository.PaymentRepository;
@@ -16,14 +17,20 @@ public class LegacyPaymentController {
     private final PaymentRepository paymentRepo;
     private final UserRepository userRepo;
 
-    public LegacyPaymentController(PaymentRepository paymentRepo, UserRepository userRepo) {
+    private final TokenValidator tokenValidator;
+
+    public LegacyPaymentController(PaymentRepository paymentRepo, UserRepository userRepo,
+                                   TokenValidator tokenValidator) {
         this.paymentRepo = paymentRepo;
         this.userRepo = userRepo;
+        this.tokenValidator = tokenValidator;
     }
 
-    // TC-PAY01: POST /payments — process payment
+    // TC-PAY01: POST /payments — PROTECTED
     @PostMapping
-    public ResponseEntity<?> processPayment(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> processPayment(@RequestBody Map<String, Object> body,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        if (!tokenValidator.isValid(auth)) return TokenValidator.unauthorized();
         Long userId = body.get("userId") != null ? Long.parseLong(body.get("userId").toString()) : 1L;
         Optional<User> userOpt = userRepo.findById(userId);
 
