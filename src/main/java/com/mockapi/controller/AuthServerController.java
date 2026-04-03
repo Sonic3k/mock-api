@@ -38,18 +38,17 @@ public class AuthServerController {
     }
 
     // ── POST /oauth/token ─────────────────────────────────────────────────────
-    @PostMapping("/oauth/token")
+    @PostMapping(value = "/oauth/token",
+                 consumes = {org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+                              org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
+                              "*/*"})
     public ResponseEntity<?> issueToken(
             @RequestParam(required = false) String grant_type,
             @RequestParam(required = false) String client_id,
             @RequestParam(required = false) String client_secret,
-            @RequestParam(required = false) String scope,
-            @RequestBody(required = false) Map<String, String> bodyMap) {
+            @RequestParam(required = false) String scope) {
 
-        // Support both form params and JSON body
-        if (client_id == null && bodyMap != null) client_id = bodyMap.get("client_id");
-        if (client_secret == null && bodyMap != null) client_secret = bodyMap.get("client_secret");
-        if (grant_type == null && bodyMap != null) grant_type = bodyMap.getOrDefault("grant_type", "client_credentials");
+        if (grant_type == null) grant_type = "client_credentials";
 
         if (!"client_credentials".equals(grant_type)) {
             return ResponseEntity.status(400).body(Map.of(
