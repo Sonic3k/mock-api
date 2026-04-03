@@ -16,8 +16,6 @@ public class AuthServerController {
         "legacy-client", new String[]{"legacy-secret", "legacy:read"},
         "modern-client", new String[]{"modern-secret", "modern:read modern:write"}
     );
-        "modern-client", new String[]{"modern-secret", "modern:read modern:write"}
-    );
 
 
     // ── POST /oauth/token ─────────────────────────────────────────────────────
