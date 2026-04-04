@@ -45,14 +45,30 @@ public class LegacyUserController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-U02: POST /users — create user, return created_at as ISO string
+    // POST /users — actually persist to DB, return real ID
     @PostMapping
     public ResponseEntity<?> createUser(@RequestBody Map<String, Object> body) {
+        User u = new User();
+        u.setName((String) body.getOrDefault("name", "New User"));
+        u.setEmail((String) body.getOrDefault("email", ""));
+        u.setRole((String) body.getOrDefault("role", "user"));
+        u.setStatus("active");
+        u.setDepartment("General");
+        u.setPhone("");
+        u.setStreet("");
+        u.setCity("");
+        u.setCountry("US");
+        u.setDiscount(0.0);
+        u.setCreatedAtIso("2024-01-15T10:30:15Z");
+        u.setCreatedAtEpoch(1705316400L);
+        u.setUpdatedAtEpoch(1705316400L);
+        u = userRepo.save(u);
+
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("user_id", 999L);
-        res.put("full_name", body.getOrDefault("name", "New User"));
-        res.put("email_address", body.getOrDefault("email", ""));
-        res.put("role", body.getOrDefault("role", "user"));
+        res.put("user_id", u.getId());
+        res.put("full_name", u.getName());
+        res.put("email_address", u.getEmail());
+        res.put("role", u.getRole());
         res.put("account_status", "active");
         res.put("created_at", "2024-01-15T10:30:15Z");   // ISO string (legacy)
         res.put("message", "User created successfully");
@@ -73,10 +89,11 @@ public class LegacyUserController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-U04: DELETE /users/{id}
+    // DELETE /users/{id} — actually delete from DB
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         if (!userRepo.existsById(id)) return ResponseEntity.notFound().build();
+        userRepo.deleteById(id);
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("user_id", id);
         res.put("deleted", true);

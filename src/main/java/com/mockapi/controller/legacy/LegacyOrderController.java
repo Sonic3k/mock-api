@@ -133,18 +133,45 @@ public class LegacyOrderController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // TC-O05: POST /orders — create order
+    // POST /orders — actually persist to DB, return real orderId
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> body) {
+        Order o = new Order();
+        o.setUserId(body.containsKey("userId") ? ((Number) body.get("userId")).longValue() : 1L);
+        o.setStatus("pending");
+        o.setTotalAmount(body.containsKey("totalAmount") ? ((Number) body.get("totalAmount")).doubleValue() : 0.0);
+        o.setCurrency((String) body.getOrDefault("currency", "USD"));
+        o.setItemsSummary("New Item");
+        o.setItemCount(1);
+        o.setShippingStreet(""); o.setShippingCity(""); o.setShippingCountry("US"); o.setShippingMethod("standard");
+        o.setCreatedAtIso("2024-01-15T10:30:00Z");
+        o.setCreatedAtEpoch(1705316400L);
+        o = orderRepo.save(o);
+        o.setOrderId("ORD-" + (20000 + o.getId()));
+        o = orderRepo.save(o);
+
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("order_id", "ORD-99999");
-        res.put("user_id", body.getOrDefault("userId", 1));
+        res.put("order_id", o.getOrderId());
+        res.put("user_id", o.getUserId());
         res.put("order_status", "pending");
-        res.put("total_amount", body.getOrDefault("totalAmount", 0.0));
-        res.put("currency", body.getOrDefault("currency", "USD"));
+        res.put("total_amount", o.getTotalAmount());
+        res.put("currency", o.getCurrency());
         res.put("created_at", "2024-01-15T10:30:00Z");
         res.put("message", "Order created successfully");
         return ResponseEntity.status(201).body(res);
+    }
+
+    // DELETE /orders/{orderId}
+    @DeleteMapping("/{orderId}")
+    public ResponseEntity<?> deleteOrder(@PathVariable String orderId) {
+        return orderRepo.findByOrderId(orderId).map(o -> {
+            orderRepo.delete(o);
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("order_id", orderId);
+            res.put("deleted", true);
+            res.put("message", "Order deleted successfully");
+            return ResponseEntity.ok(res);
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     // TC-O06: GET /orders/{orderId}/tracking

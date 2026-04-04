@@ -26,6 +26,15 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        resetAll();
+    }
+
+    /** Clears all tables and re-seeds with original data. Callable from /test/reset. */
+    public void resetAll() {
+        paymentRepo.deleteAll();
+        orderRepo.deleteAll();
+        productRepo.deleteAll();
+        userRepo.deleteAll();
         seedUsers();
         seedProducts();
         seedOrders();
