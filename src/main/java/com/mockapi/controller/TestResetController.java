@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/test")
+@RequestMapping({"/test", "/legacy/api/test", "/modernized/api/test"})
 public class TestResetController {
 
     private final DataSeeder dataSeeder;
