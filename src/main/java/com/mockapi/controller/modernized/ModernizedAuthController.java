@@ -40,14 +40,12 @@ public class ModernizedAuthController {
 
     // TC-A04: PASS — same fields as legacy
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody(required = false) Map<String, Object> body,
-                                      @RequestParam(required = false) String username,
-                                      @RequestParam(required = false) String email) {
+    public ResponseEntity<?> register(@RequestParam Map<String, String> params) {
         Map<String, Object> res = new LinkedHashMap<>();
-        String resolvedEmail = email != null ? email :
-                (body != null ? (String) body.getOrDefault("email", "new@example.com") : "new@example.com");
+        String username = params.getOrDefault("username", "newuser");
+        String resolvedEmail = params.getOrDefault("email", "new@example.com");
         res.put("user_id", 1001L);
-        res.put("username", username != null ? username : "newuser");
+        res.put("username", username);
         res.put("email_address", resolvedEmail);
         res.put("account_status", "pending_verification");
         res.put("created_at", "2024-01-15T10:30:00Z");
